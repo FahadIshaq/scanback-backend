@@ -14,7 +14,8 @@ app.use(cors({
     process.env.FRONTEND_URL || 'http://localhost:3000',
     'http://localhost:3001',
     'http://192.168.0.104:3000',
-    'http://192.168.0.104:3001'
+    'http://192.168.0.104:3001',
+    'https://scanback-admin.vercel.app'
   ],
   credentials: true
 }));
