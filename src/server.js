@@ -11,11 +11,10 @@ const app = express();
 app.use(helmet());
 app.use(cors({
   origin: [
-    process.env.FRONTEND_URL || 'http://localhost:3000',
-    'http://localhost:3001',
-    'http://192.168.0.104:3000',
-    'http://192.168.0.104:3001',
-    'https://scanback-admin.vercel.app'
+    process.env.FRONTEND_URL || 'https://scanback.vercel.app',
+    'https://scanback-admin.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001'
   ],
   credentials: true
 }));
