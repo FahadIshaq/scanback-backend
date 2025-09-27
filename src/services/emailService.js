@@ -315,7 +315,7 @@ class EmailService {
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/reset-password?token=${resetToken}`;
     
     const mailOptions = {
-      from: this.from,
+      from: process.env.EMAIL_FROM || 'ScanBack <noreply@scanback.co.za>',
       to: email,
       subject: 'Password Reset - ScanBack',
       html: this.getPasswordResetEmailTemplate(resetUrl)
@@ -323,6 +323,27 @@ class EmailService {
 
     await this.transporter.sendMail(mailOptions);
     console.log('Password reset email sent to:', email);
+  }
+
+  /**
+   * Send password reset OTP email
+   */
+  async sendPasswordResetOTP(userEmail, userName, otp) {
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || 'ScanBack <noreply@scanback.co.za>',
+      to: userEmail,
+      subject: 'Password Reset Verification Code - ScanBack',
+      html: this.getPasswordResetOTPEmailTemplate(userName, otp)
+    };
+
+    try {
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Password reset OTP email sent:', result.messageId);
+      return { success: true, messageId: result.messageId };
+    } catch (error) {
+      console.error('❌ Failed to send password reset OTP email:', error);
+      throw new Error(`Failed to send email: ${error.message}`);
+    }
   }
 
   /**
@@ -392,6 +413,68 @@ class EmailService {
   }
 
   /**
+   * Get password reset OTP email template
+   */
+  getPasswordResetOTPEmailTemplate(userName, otp) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Password Reset Verification - ScanBack</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .content { background: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px; }
+          .otp-box { background: #1e293b; color: #fbbf24; padding: 30px; border-radius: 12px; text-align: center; font-size: 36px; font-weight: bold; margin: 30px 0; letter-spacing: 8px; }
+          .button { display: inline-block; background: #f59e0b; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 30px; color: #64748b; font-size: 14px; }
+          .warning { background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 8px; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🔐 Password Reset</h1>
+            <p>Your verification code is ready</p>
+          </div>
+          <div class="content">
+            <h2>Hello ${userName}!</h2>
+            <p>You requested to reset your password for your ScanBack account. Use the verification code below to continue:</p>
+            
+            <div class="otp-box">${otp}</div>
+            
+            <div class="warning">
+              <p><strong>⚠️ Important:</strong></p>
+              <ul style="margin: 10px 0; padding-left: 20px;">
+                <li>This code expires in 10 minutes</li>
+                <li>Do not share this code with anyone</li>
+                <li>If you didn't request this reset, please ignore this email</li>
+              </ul>
+            </div>
+            
+            <p>Enter this code in the verification form to reset your password.</p>
+            
+            <h3>What's Next?</h3>
+            <ul>
+              <li>📱 Enter the verification code above</li>
+              <li>🔐 Create your new password</li>
+              <li>✅ Login with your new password</li>
+            </ul>
+          </div>
+          <div class="footer">
+            <p>© 2025 ScanBack Technologies. All rights reserved.</p>
+            <p>This code will expire in 10 minutes for security reasons.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  /**
    * Get existing user QR activation email template
    */
   getExistingUserQRActivationEmailTemplate(userName, itemName, loginEmail) {
@@ -437,6 +520,96 @@ class EmailService {
             
             <p style="color: #64748b; line-height: 1.6; margin: 1.5rem 0 0 0;">
               <strong>Note:</strong> If you don't remember your password, you can use the "Forgot Password" feature on the login page.
+            </p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Send contact update OTP email
+   */
+  async sendContactUpdateOTP(email, otp) {
+    try {
+      console.log('Sending contact update OTP to:', email, 'OTP:', otp);
+      
+      const mailOptions = {
+        from: process.env.EMAIL_FROM || 'ScanBack <noreply@scanback.co.za>',
+        to: email,
+        subject: "Verify Your Contact Information Update - ScanBack",
+        html: this.getContactUpdateOTPEmailTemplate(otp)
+      };
+
+      console.log('Mail options:', mailOptions);
+      
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Contact update OTP sent to ${email}, messageId: ${result.messageId}`);
+      return { success: true, messageId: result.messageId };
+    } catch (error) {
+      console.error('❌ Error sending contact update OTP email:', error);
+      throw new Error(`Failed to send contact update OTP email: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get contact update OTP email template
+   */
+  getContactUpdateOTPEmailTemplate(otp) {
+    return `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Verify Contact Update - ScanBack</title>
+      </head>
+      <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; line-height: 1.6;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+          <!-- Header -->
+          <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; text-align: center;">
+            <div style="display: inline-block; background-color: #ffffff; padding: 0.75rem; border-radius: 0.75rem; margin-bottom: 1rem;">
+              <div style="width: 2rem; height: 2rem; background-color: #1e293b; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center;">
+                <span style="color: #ffffff; font-weight: bold; font-size: 1.25rem;">QR</span>
+              </div>
+            </div>
+            <h1 style="color: #ffffff; margin: 0; font-size: 1.5rem; font-weight: 600;">Contact Update Verification</h1>
+            <p style="color: #cbd5e1; margin: 0.5rem 0 0 0; font-size: 0.875rem;">ScanBack QR Code Service</p>
+          </div>
+
+          <!-- Content -->
+          <div style="padding: 2rem;">
+            <div style="text-align: center; margin-bottom: 2rem;">
+              <div style="display: inline-block; background-color: #f1f5f9; padding: 1rem; border-radius: 0.75rem; margin-bottom: 1.5rem;">
+                <div style="font-size: 2rem; font-weight: bold; color: #1e293b; letter-spacing: 0.5rem; font-family: 'Courier New', monospace;">${otp}</div>
+              </div>
+              <h2 style="color: #1e293b; margin: 0 0 1rem 0; font-size: 1.25rem; font-weight: 600;">Verify Your Contact Information Update</h2>
+              <p style="color: #64748b; margin: 0; font-size: 0.875rem;">
+                You're updating your contact information for your QR code. Please use the verification code above to complete the update.
+              </p>
+            </div>
+
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 1.5rem; margin: 1.5rem 0;">
+              <h3 style="color: #1e293b; margin: 0 0 1rem 0; font-size: 1rem; font-weight: 600;">Security Information</h3>
+              <ul style="color: #64748b; margin: 0; padding-left: 1.5rem; font-size: 0.875rem;">
+                <li style="margin-bottom: 0.5rem;">This code expires in 10 minutes</li>
+                <li style="margin-bottom: 0.5rem;">Never share this code with anyone</li>
+                <li style="margin-bottom: 0.5rem;">If you didn't request this update, please contact support immediately</li>
+              </ul>
+            </div>
+
+            <div style="text-align: center; margin-top: 2rem;">
+              <p style="color: #64748b; font-size: 0.875rem; margin: 0;">
+                If you didn't request this contact update, please ignore this email or contact our support team.
+              </p>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="background-color: #f8fafc; padding: 1.5rem; text-align: center; border-top: 1px solid #e2e8f0;">
+            <p style="color: #64748b; margin: 0; font-size: 0.75rem;">
+              © 2024 ScanBack QR Code Service. All rights reserved.
             </p>
           </div>
         </div>

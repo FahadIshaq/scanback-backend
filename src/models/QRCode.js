@@ -112,6 +112,13 @@ const qrCodeSchema = new mongoose.Schema({
       userAgent: String,
       location: String
     }]
+  },
+  // OTP fields for contact updates
+  updateOTP: {
+    code: String,
+    expires: Date,
+    newEmail: String,
+    newPhone: String
   }
 }, {
   timestamps: true
@@ -125,7 +132,7 @@ qrCodeSchema.index({ 'contact.email': 1 });
 
 // Virtual for QR code URL
 qrCodeSchema.virtual('qrUrl').get(function() {
-  return `${process.env.QR_CODE_BASE_URL || 'http://192.168.0.104:3001/scan'}/${this.code}`;
+  return `${process.env.QR_CODE_BASE_URL || 'http://192.168.0.107:3000/scan'}/${this.code}`;
 });
 
 // Method to increment scan count

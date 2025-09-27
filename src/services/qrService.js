@@ -45,7 +45,7 @@ class QRService {
       const code = this.generateUniqueCode();
       
       // Generate QR code image
-      const qrUrl = `${process.env.QR_CODE_BASE_URL || 'http://192.168.0.104:3001/scan'}/${code}`;
+      const qrUrl = `${process.env.QR_CODE_BASE_URL || 'http://192.168.0.107:3000/scan'}/${code}`;
       const qrImageDataURL = await this.generateQRImage(qrUrl);
       
       // Convert data URL to buffer
@@ -105,6 +105,23 @@ class QRService {
       const qrCode = await QRCodeModel.findOne({ code })
         .populate('owner', 'name email phone')
         .lean();
+      
+      if (!qrCode) {
+        throw new Error('QR code not found');
+      }
+
+      return qrCode;
+    } catch (error) {
+      throw new Error(`Failed to get QR code: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get QR code by code string without population (for ownership verification)
+   */
+  static async getQRCodeByCodeForOwnership(code) {
+    try {
+      const qrCode = await QRCodeModel.findOne({ code }).lean();
       
       if (!qrCode) {
         throw new Error('QR code not found');
@@ -257,14 +274,23 @@ class QRService {
    */
   static async updateQRCode(code, updateData) {
     try {
+      const updateFields = {};
+      
+      if (updateData.details) {
+        updateFields['details'] = updateData.details;
+      }
+      
+      if (updateData.contact) {
+        updateFields['contact'] = updateData.contact;
+      }
+      
+      if (updateData.settings) {
+        updateFields['settings'] = updateData.settings;
+      }
+
       const qrCode = await QRCodeModel.findOneAndUpdate(
         { code },
-        { 
-          $set: {
-            'details': updateData.details,
-            'contact': updateData.contact
-          }
-        },
+        { $set: updateFields },
         { new: true }
       );
 
@@ -301,6 +327,129 @@ class QRService {
       return qrCode;
     } catch (error) {
       throw new Error(`Failed to deactivate QR code: ${error.message}`);
+    }
+  }
+
+  /**
+   * Store OTP for contact update verification
+   */
+  static async storeUpdateOTP(code, otp, expires, newEmail, newPhone) {
+    try {
+      await QRCodeModel.findOneAndUpdate(
+        { code },
+        {
+          $set: {
+            'updateOTP.code': otp,
+            'updateOTP.expires': expires,
+            'updateOTP.newEmail': newEmail,
+            'updateOTP.newPhone': newPhone
+          }
+        }
+      );
+    } catch (error) {
+      throw new Error(`Failed to store update OTP: ${error.message}`);
+    }
+  }
+
+  /**
+   * Verify OTP for contact update
+   */
+  static async verifyUpdateOTP(code, otp) {
+    try {
+      const qrCode = await QRCodeModel.findOne({ code }).lean();
+      
+      if (!qrCode || !qrCode.updateOTP) {
+        return false;
+      }
+
+      // Check if OTP matches and hasn't expired
+      if (qrCode.updateOTP.code === otp && new Date() < new Date(qrCode.updateOTP.expires)) {
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      throw new Error(`Failed to verify update OTP: ${error.message}`);
+    }
+  }
+
+  /**
+   * Clear OTP after successful update
+   */
+  static async clearUpdateOTP(code) {
+    try {
+      await QRCodeModel.findOneAndUpdate(
+        { code },
+        {
+          $unset: {
+            'updateOTP.code': 1,
+            'updateOTP.expires': 1,
+            'updateOTP.newEmail': 1,
+            'updateOTP.newPhone': 1
+          }
+        }
+      );
+    } catch (error) {
+      throw new Error(`Failed to clear update OTP: ${error.message}`);
+    }
+  }
+
+  /**
+   * Toggle QR code status (active/inactive)
+   */
+  static async toggleQRCodeStatus(code, newStatus) {
+    try {
+      const qrCode = await QRCodeModel.findOneAndUpdate(
+        { code },
+        { 
+          $set: { 
+            status: newStatus,
+            lastModified: new Date()
+          } 
+        },
+        { new: true }
+      );
+
+      if (!qrCode) {
+        throw new Error('QR code not found');
+      }
+
+      return qrCode;
+    } catch (error) {
+      throw new Error(`Failed to toggle QR code status: ${error.message}`);
+    }
+  }
+
+  /**
+   * Track QR code scan
+   */
+  static async trackScan(code, scanData) {
+    try {
+      const qrCode = await QRCodeModel.findOne({ code });
+      
+      if (!qrCode) {
+        throw new Error('QR code not found');
+      }
+
+      if (!qrCode.isActivated) {
+        throw new Error('QR code is not activated yet');
+      }
+
+      // Increment scan count and add to history
+      qrCode.incrementScanCount(
+        scanData.ipAddress,
+        scanData.userAgent,
+        scanData.location
+      );
+
+      await qrCode.save();
+
+      return {
+        scanCount: qrCode.scanCount,
+        lastScanned: qrCode.lastScanned
+      };
+    } catch (error) {
+      throw new Error(`Failed to track scan: ${error.message}`);
     }
   }
 }
