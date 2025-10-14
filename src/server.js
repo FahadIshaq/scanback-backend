@@ -18,8 +18,11 @@ app.use(cors({
     'http://localhost:5001',
     'http://localhost:3002',
     'http://localhost:3001',
-    'http://192.168.0.107:3000',
-    'http://192.168.0.107:3001',
+    'http://http://192.168.100.18:3000',
+    'http://http://192.168.100.18:3001',
+    'http://192.168.100.18:3000',
+    'http://192.168.100.18:3001',
+    'http://192.168.100.18:5001',  
     'https://scanback.vercel.app'
   ],
   credentials: true
