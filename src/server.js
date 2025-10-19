@@ -23,7 +23,9 @@ app.use(cors({
     'https://scanback.vercel.app:3000',
     'https://scanback.vercel.app:3001',
     'https://scanback.vercel.app:5001',  
-    'https://scanback.vercel.app'
+    'https://scanback.vercel.app',
+    'https://scanback-admin.vercel.app/login',
+    'https://scanback-admin.vercel.app'
   ],
   credentials: true
 }));
