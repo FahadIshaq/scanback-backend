@@ -30,9 +30,9 @@ const qrCodeSchema = new mongoose.Schema({
     model: String,
     serialNumber: String,
     // Pet specific fields
-    species: String,
-    breed: String,
-    age: Number,
+    image: String,
+    emergencyDetails: String,
+    pedigreeInfo: String,
     microchipId: String,
     // Item specific fields
     value: Number,
@@ -74,6 +74,10 @@ const qrCodeSchema = new mongoose.Schema({
       default: true
     },
     locationSharing: {
+      type: Boolean,
+      default: true
+    },
+    showContactOnFinderPage: {
       type: Boolean,
       default: true
     }
@@ -132,7 +136,7 @@ qrCodeSchema.index({ 'contact.email': 1 });
 
 // Virtual for QR code URL
 qrCodeSchema.virtual('qrUrl').get(function() {
-  return `${process.env.QR_CODE_BASE_URL || 'http://192.168.100.16:3001/scan'}/${this.code}`;
+  return `${process.env.QR_CODE_BASE_URL || 'https://scanback.vercel.app:3001/scan'}/${this.code}`;
 });
 
 // Method to increment scan count

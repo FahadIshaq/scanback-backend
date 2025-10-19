@@ -98,6 +98,7 @@ router.get('/:code', async (req, res) => {
         status: qrCode.status,
         details: qrCode.details,
         contact: qrCode.contact,
+        settings: qrCode.settings,
         qrUrl: qrCode.qrUrl
       }
     });
@@ -339,7 +340,8 @@ router.put('/:code', auth, [
   body('contact.phone').optional().isMobilePhone().withMessage('Valid phone number is required'),
   body('contact.email').optional().isEmail().withMessage('Valid email is required'),
   body('settings.instantAlerts').optional().isBoolean().withMessage('Instant alerts must be boolean'),
-  body('settings.locationSharing').optional().isBoolean().withMessage('Location sharing must be boolean')
+  body('settings.locationSharing').optional().isBoolean().withMessage('Location sharing must be boolean'),
+  body('settings.showContactOnFinderPage').optional().isBoolean().withMessage('Show contact on finder page must be boolean')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
