@@ -10,23 +10,7 @@ const app = express();
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL || 'https://scanback.vercel.app',
-    'https://scanback-admin.vercel.app',
-    'https://scanback-backend.onrender.com',
-    'http://localhost:3000',
-    'http://localhost:5001',
-    'http://localhost:3002',
-    'http://localhost:3001',
-    'http://https://scanback.vercel.app:3000',
-    'http://https://scanback.vercel.app:3001',
-    'https://scanback.vercel.app:3000',
-    'https://scanback.vercel.app:3001',
-    'https://scanback.vercel.app:5001',  
-    'https://scanback.vercel.app',
-    'https://scanback-admin.vercel.app/login',
-    'https://scanback-admin.vercel.app'
-  ],
+  origin: true, // Allow all origins for debugging
   credentials: true
 }));
 

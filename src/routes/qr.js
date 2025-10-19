@@ -123,8 +123,15 @@ router.post('/:code/activate', [
   body('details.name').notEmpty().withMessage('Item/Pet name is required')
 ], async (req, res) => {
   try {
+    console.log('Activation request received:', {
+      code: req.params.code,
+      body: req.body,
+      headers: req.headers
+    });
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array());
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
