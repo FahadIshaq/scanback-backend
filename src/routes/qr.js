@@ -78,7 +78,7 @@ router.get('/user', auth, async (req, res) => {
 router.get('/:code', async (req, res) => {
   try {
     const { code } = req.params;
-    const qrCode = await QRService.getQRCodeByCode(code);
+    const qrCode = await QRService.getQRCodeByCodePublic(code);
 
     // Check if QR code is inactive
     if (qrCode.status === 'inactive') {
@@ -200,6 +200,37 @@ router.post('/:code/activate', [
         console.log('Existing user QR activation email sent');
       } catch (emailError) {
         console.error('Failed to send existing user email:', emailError);
+      }
+    }
+
+    // Check if QR code is already activated (use fast method)
+    const existingQRCode = await QRService.getQRCodeByCodeForOwnership(code);
+    
+    if (existingQRCode.isActivated) {
+      // Check if it's activated by the same user
+      if (existingQRCode.owner && existingQRCode.owner.toString() === user._id.toString()) {
+        console.log('QR code already activated by same user:', user.email);
+        return res.json({
+          success: true,
+          message: 'QR code is already activated by you',
+          data: {
+            qrCode: existingQRCode,
+            qrUrl: existingQRCode.qrUrl,
+            tempPassword: tempPassword, // Only for new users
+            isNewUser: !!tempPassword,
+            user: {
+              email: user.email,
+              name: user.name,
+              // For existing users, return their temp password if it exists, otherwise indicate they should use their existing password
+              existingPassword: !tempPassword ? (user.tempPassword || 'Your existing password') : null
+            }
+          }
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: 'This QR code has already been activated by another user'
+        });
       }
     }
 

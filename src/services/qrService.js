@@ -3,7 +3,47 @@ const { v4: uuidv4 } = require('uuid');
 const QRCodeModel = require('../models/QRCode');
 const User = require('../models/User');
 
+// Aggressive in-memory cache for QR codes (10 minute TTL)
+const qrCache = new Map();
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const POPULAR_CODES = ['1722986DCAA8']; // Preload popular codes
+
+// Request queue to handle concurrent requests efficiently
+const requestQueue = new Map(); // Map of code -> Promise to avoid duplicate requests
+
 class QRService {
+  /**
+   * Initialize cache with popular QR codes and warm connections
+   */
+  static async initializeCache() {
+    console.log('🚀 Preloading popular QR codes and warming connections...');
+    
+    // Run cache initialization in background to not block server startup
+    setImmediate(async () => {
+      try {
+        // Warm up database connection with a simple query
+        await QRCodeModel.findOne({}).limit(1).lean();
+        console.log('🔥 Database connection warmed up');
+        
+        // Preload popular QR codes in parallel for faster initialization
+        const preloadPromises = POPULAR_CODES.map(async (code) => {
+          try {
+            await this.getQRCodeByCodePublic(code);
+            console.log(`✅ Preloaded QR code: ${code}`);
+          } catch (error) {
+            console.log(`⚠️ Could not preload QR code: ${code}`);
+          }
+        });
+        
+        // Wait for all preloads to complete (but don't block server startup)
+        await Promise.allSettled(preloadPromises);
+        console.log('📦 Cache initialization complete');
+      } catch (error) {
+        console.log('⚠️ Cache initialization failed:', error.message);
+      }
+    });
+  }
+
   /**
    * Generate a unique QR code
    */
@@ -45,7 +85,7 @@ class QRService {
       const code = this.generateUniqueCode();
       
       // Generate QR code image
-      const qrUrl = `${process.env.QR_CODE_BASE_URL || 'https://scanback.vercel.app:3001/scan'}/${code}`;
+      const qrUrl = `${process.env.QR_CODE_BASE_URL || 'http://192.168.100.22:3001/scan'}/${code}`;
       const qrImageDataURL = await this.generateQRImage(qrUrl);
       
       // Convert data URL to buffer
@@ -117,6 +157,120 @@ class QRService {
   }
 
   /**
+   * Get QR code by code string for public access (optimized with caching and request queuing)
+   */
+  static async getQRCodeByCodePublic(code) {
+    try {
+      // Check cache first
+      const cacheKey = `qr_${code}`;
+      const cached = qrCache.get(cacheKey);
+      
+      if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+        console.log(`📦 Cache hit for QR code: ${code}`);
+        return cached.data;
+      }
+
+      // Check if there's already a request in progress for this code
+      if (requestQueue.has(code)) {
+        console.log(`⏳ Request already in progress for QR code: ${code}, waiting...`);
+        return await requestQueue.get(code);
+      }
+
+      console.log(`🔍 Cache miss for QR code: ${code}, fetching from database...`);
+      
+      // Create a promise for this request and add it to the queue
+      const requestPromise = this.fetchQRCodeFromDatabase(code);
+      requestQueue.set(code, requestPromise);
+
+      try {
+        const qrCode = await requestPromise;
+        return qrCode;
+      } finally {
+        // Remove from queue when done
+        requestQueue.delete(code);
+      }
+    } catch (error) {
+      throw new Error(`Failed to get QR code: ${error.message}`);
+    }
+  }
+
+  /**
+   * Fetch QR code from database (internal method)
+   */
+  static async fetchQRCodeFromDatabase(code) {
+    // ULTRA-OPTIMIZED query with minimal fields and hints
+    const qrCode = await QRCodeModel.findOne(
+      { code }, 
+      {
+        code: 1,
+        type: 1,
+        isActivated: 1,
+        status: 1,
+        'details.name': 1,
+        'details.description': 1,
+        'details.image': 1,
+        'details.category': 1,
+        'details.color': 1,
+        'details.brand': 1,
+        'details.model': 1,
+        'details.emergencyDetails': 1,
+        'details.pedigreeInfo': 1,
+        'details.microchipId': 1,
+        // Emergency Details fields
+        'details.medicalNotes': 1,
+        'details.vetName': 1,
+        'details.vetPhone': 1,
+        'details.vetCountryCode': 1,
+        'details.emergencyContact': 1,
+        'details.emergencyCountryCode': 1,
+        // Pedigree Information fields
+        'details.breed': 1,
+        'details.age': 1,
+        'details.registrationNumber': 1,
+        'details.breederInfo': 1,
+        'contact.name': 1,
+        'contact.phone': 1,
+        'contact.email': 1,
+        'contact.message': 1,
+        'settings.instantAlerts': 1,
+        'settings.locationSharing': 1,
+        'settings.showContactOnFinderPage': 1
+      }
+    )
+    .hint({ code: 1 }) // Force index usage
+    .lean()
+    .maxTimeMS(5000); // 5 second query timeout
+    
+    if (!qrCode) {
+      throw new Error('QR code not found');
+    }
+
+    // Cache the result
+    const cacheKey = `qr_${code}`;
+    qrCache.set(cacheKey, {
+      data: qrCode,
+      timestamp: Date.now()
+    });
+
+    // Clean up old cache entries
+    this.cleanupCache();
+
+    return qrCode;
+  }
+
+  /**
+   * Clean up expired cache entries
+   */
+  static cleanupCache() {
+    const now = Date.now();
+    for (const [key, value] of qrCache.entries()) {
+      if (now - value.timestamp > CACHE_TTL) {
+        qrCache.delete(key);
+      }
+    }
+  }
+
+  /**
    * Get QR code by code string without population (for ownership verification)
    */
   static async getQRCodeByCodeForOwnership(code) {
@@ -173,6 +327,11 @@ class QRService {
 
       await qrCode.save();
       
+      // Clear cache for this QR code since it's been updated
+      const cacheKey = `qr_${code}`;
+      qrCache.delete(cacheKey);
+      console.log(`🗑️ Cleared cache for QR code: ${code}`);
+      
       return qrCode;
     } catch (error) {
       throw new Error(`Failed to activate QR code: ${error.message}`);
@@ -202,6 +361,11 @@ class QRService {
       );
 
       await qrCode.save();
+
+      // Clear cache for this QR code since it's been updated
+      const cacheKey = `qr_${qrCode.code}`;
+      qrCache.delete(cacheKey);
+      console.log(`🗑️ Cleared cache for QR code: ${qrCode.code}`);
 
       return {
         qrCode,
@@ -237,6 +401,11 @@ class QRService {
       // Mark as found
       qrCode.markAsFound(finderDetails);
       await qrCode.save();
+
+      // Clear cache for this QR code since it's been updated
+      const cacheKey = `qr_${qrCode.code}`;
+      qrCache.delete(cacheKey);
+      console.log(`🗑️ Cleared cache for QR code: ${qrCode.code}`);
 
       // Update user stats
       await User.findByIdAndUpdate(qrCode.owner, {
@@ -444,6 +613,11 @@ class QRService {
       );
 
       await qrCode.save();
+
+      // Clear cache for this QR code since it's been updated
+      const cacheKey = `qr_${qrCode.code}`;
+      qrCache.delete(cacheKey);
+      console.log(`🗑️ Cleared cache for QR code: ${qrCode.code}`);
 
       return {
         scanCount: qrCode.scanCount,
