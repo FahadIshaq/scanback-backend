@@ -85,7 +85,7 @@ class QRService {
       const code = this.generateUniqueCode();
       
       // Generate QR code image
-      const qrUrl = `${process.env.QR_CODE_BASE_URL || 'http://192.168.100.22:3001/scan'}/${code}`;
+      const qrUrl = `${process.env.QR_CODE_BASE_URL || 'https://scanback.vercel.app/scan'}/${code}`;
       const qrImageDataURL = await this.generateQRImage(qrUrl);
       
       // Convert data URL to buffer

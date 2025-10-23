@@ -148,7 +148,7 @@ qrCodeSchema.index({ 'contact.email': 1 });
 
 // Virtual for QR code URL
 qrCodeSchema.virtual('qrUrl').get(function() {
-  return `${process.env.QR_CODE_BASE_URL || 'http://192.168.100.22:3001/scan'}/${this.code}`;
+  return `${process.env.QR_CODE_BASE_URL || 'https://scanback.vercel.app/scan'}/${this.code}`;
 });
 
 // Method to increment scan count
