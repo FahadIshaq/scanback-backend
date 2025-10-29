@@ -10,7 +10,7 @@ const router = express.Router();
  * @access  Private
  */
 router.post('/generate', auth, [
-  body('type').isIn(['item', 'pet']).withMessage('Type must be either item or pet'),
+  body('type').isIn(['item', 'pet', 'emergency']).withMessage('Type must be either item, pet, or emergency'),
   body('details.name').notEmpty().withMessage('Name is required'),
   body('contact.phone').isMobilePhone().withMessage('Valid phone number is required'),
   body('contact.email').isEmail().withMessage('Valid email is required')
@@ -123,15 +123,8 @@ router.post('/:code/activate', [
   body('details.name').notEmpty().withMessage('Item/Pet name is required')
 ], async (req, res) => {
   try {
-    console.log('Activation request received:', {
-      code: req.params.code,
-      body: req.body,
-      headers: req.headers
-    });
-    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log('Validation errors:', errors.array());
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -148,11 +141,8 @@ router.post('/:code/activate', [
     let tempPassword = null;
     
     if (!user) {
-      console.log('Creating new user for email:', activationData.contact.email);
-      
       // Generate temporary password first
       tempPassword = Math.random().toString(36).slice(-8).toUpperCase();
-      console.log('Generated temp password for new user:', tempPassword);
       
       // Create new user with the temporary password (pre-save hook will hash it)
       user = new User({
@@ -169,8 +159,6 @@ router.post('/:code/activate', [
       user.tempPasswordExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
       
       await user.save();
-      console.log('New user created:', user.email, user.name);
-      console.log('Final hashed password:', user.password);
       
       // Send welcome email with temporary password
       try {
@@ -180,14 +168,10 @@ router.post('/:code/activate', [
           activationData.contact.name || activationData.details.name,
           tempPassword
         );
-        console.log('Welcome email sent to new user');
       } catch (emailError) {
         console.error('Failed to send welcome email:', emailError);
       }
     } else {
-      console.log('User already exists:', user.email, user.name);
-      // Don't change password for existing users
-      
       // Send email with existing credentials to existing user
       try {
         const emailService = require('../services/emailService');
@@ -197,7 +181,6 @@ router.post('/:code/activate', [
           activationData.details.name,
           activationData.contact.email // This is the same as user.email, but keeping for clarity
         );
-        console.log('Existing user QR activation email sent');
       } catch (emailError) {
         console.error('Failed to send existing user email:', emailError);
       }
@@ -209,7 +192,6 @@ router.post('/:code/activate', [
     if (existingQRCode.isActivated) {
       // Check if it's activated by the same user
       if (existingQRCode.owner && existingQRCode.owner.toString() === user._id.toString()) {
-        console.log('QR code already activated by same user:', user.email);
         return res.json({
           success: true,
           message: 'QR code is already activated by you',
@@ -236,7 +218,6 @@ router.post('/:code/activate', [
 
     // Now activate the QR code with the user ID
     const qrCode = await QRService.activateQRCode(code, activationData, user._id);
-    console.log('QR code activated for user:', user.email);
     
     res.json({
       success: true,
@@ -476,8 +457,6 @@ router.post('/:code/send-update-otp', auth, [
     const { code } = req.params;
     const { newEmail, newPhone } = req.body;
 
-    console.log('Send update OTP request:', { code, newEmail, newPhone });
-
     // Verify ownership
     const qrCode = await QRService.getQRCodeByCodeForOwnership(code);
     if (qrCode.owner.toString() !== req.user.id) {
@@ -491,8 +470,6 @@ router.post('/:code/send-update-otp', auth, [
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    console.log('Generated OTP:', otp, 'Expires:', otpExpires);
-
     // Store OTP in QR code document
     await QRService.storeUpdateOTP(code, otp, otpExpires, newEmail, newPhone);
 
@@ -500,12 +477,10 @@ router.post('/:code/send-update-otp', auth, [
     const emailService = require('../services/emailService');
     if (newEmail) {
       // Send to new email if email is being changed
-      console.log('Sending OTP to new email:', newEmail);
       await emailService.sendContactUpdateOTP(newEmail, otp);
     } else {
       // Send to current email if only phone is being changed
       const currentEmail = qrCode.contact?.email;
-      console.log('Sending OTP to current email:', currentEmail);
       if (currentEmail) {
         await emailService.sendContactUpdateOTP(currentEmail, otp);
       } else {

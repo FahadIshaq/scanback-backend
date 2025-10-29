@@ -16,28 +16,23 @@ class QRService {
    * Initialize cache with popular QR codes and warm connections
    */
   static async initializeCache() {
-    console.log('🚀 Preloading popular QR codes and warming connections...');
-    
     // Run cache initialization in background to not block server startup
     setImmediate(async () => {
       try {
         // Warm up database connection with a simple query
         await QRCodeModel.findOne({}).limit(1).lean();
-        console.log('🔥 Database connection warmed up');
         
         // Preload popular QR codes in parallel for faster initialization
         const preloadPromises = POPULAR_CODES.map(async (code) => {
           try {
             await this.getQRCodeByCodePublic(code);
-            console.log(`✅ Preloaded QR code: ${code}`);
           } catch (error) {
-            console.log(`⚠️ Could not preload QR code: ${code}`);
+            // Ignore individual preload failures
           }
         });
         
         // Wait for all preloads to complete (but don't block server startup)
         await Promise.allSettled(preloadPromises);
-        console.log('📦 Cache initialization complete');
       } catch (error) {
         console.log('⚠️ Cache initialization failed:', error.message);
       }
@@ -166,18 +161,14 @@ class QRService {
       const cached = qrCache.get(cacheKey);
       
       if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
-        console.log(`📦 Cache hit for QR code: ${code}`);
         return cached.data;
       }
 
       // Check if there's already a request in progress for this code
       if (requestQueue.has(code)) {
-        console.log(`⏳ Request already in progress for QR code: ${code}, waiting...`);
         return await requestQueue.get(code);
       }
 
-      console.log(`🔍 Cache miss for QR code: ${code}, fetching from database...`);
-      
       // Create a promise for this request and add it to the queue
       const requestPromise = this.fetchQRCodeFromDatabase(code);
       requestQueue.set(code, requestPromise);
@@ -223,6 +214,20 @@ class QRService {
         'details.vetCountryCode': 1,
         'details.emergencyContact': 1,
         'details.emergencyCountryCode': 1,
+        // New Emergency fields
+        'details.medicalAidProvider': 1,
+        'details.medicalAidNumber': 1,
+        'details.bloodType': 1,
+        'details.allergies': 1,
+        'details.medications': 1,
+        'details.organDonor': 1,
+        'details.iceNote': 1,
+        'details.emergencyContact1Name': 1,
+        'details.emergencyContact1Phone': 1,
+        'details.emergencyContact1CountryCode': 1,
+        'details.emergencyContact2Name': 1,
+        'details.emergencyContact2Phone': 1,
+        'details.emergencyContact2CountryCode': 1,
         // Pedigree Information fields
         'details.breed': 1,
         'details.age': 1,
@@ -306,6 +311,12 @@ class QRService {
       qrCode.isActivated = true;
       qrCode.activationDate = new Date();
       qrCode.owner = ownerId; // Set the owner
+      
+      // Update type if provided in activation data (for "any" type QR codes)
+      if (activationData.type && ['item', 'pet', 'emergency'].includes(activationData.type)) {
+        qrCode.type = activationData.type;
+      }
+      
       qrCode.details = { ...qrCode.details, ...activationData.details };
       qrCode.contact = { 
         ...qrCode.contact, 
@@ -330,7 +341,6 @@ class QRService {
       // Clear cache for this QR code since it's been updated
       const cacheKey = `qr_${code}`;
       qrCache.delete(cacheKey);
-      console.log(`🗑️ Cleared cache for QR code: ${code}`);
       
       return qrCode;
     } catch (error) {
@@ -365,7 +375,6 @@ class QRService {
       // Clear cache for this QR code since it's been updated
       const cacheKey = `qr_${qrCode.code}`;
       qrCache.delete(cacheKey);
-      console.log(`🗑️ Cleared cache for QR code: ${qrCode.code}`);
 
       return {
         qrCode,
@@ -405,7 +414,6 @@ class QRService {
       // Clear cache for this QR code since it's been updated
       const cacheKey = `qr_${qrCode.code}`;
       qrCache.delete(cacheKey);
-      console.log(`🗑️ Cleared cache for QR code: ${qrCode.code}`);
 
       // Update user stats
       await User.findByIdAndUpdate(qrCode.owner, {
@@ -617,7 +625,6 @@ class QRService {
       // Clear cache for this QR code since it's been updated
       const cacheKey = `qr_${qrCode.code}`;
       qrCache.delete(cacheKey);
-      console.log(`🗑️ Cleared cache for QR code: ${qrCode.code}`);
 
       return {
         scanCount: qrCode.scanCount,

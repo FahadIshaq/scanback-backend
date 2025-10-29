@@ -9,7 +9,7 @@ const qrCodeSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['item', 'pet'],
+    enum: ['item', 'pet', 'emergency', 'any'],
     required: true
   },
   owner: {
@@ -49,7 +49,21 @@ const qrCodeSchema = new mongoose.Schema({
     // Item specific fields
     value: Number,
     purchaseDate: Date,
-    warrantyExpiry: Date
+    warrantyExpiry: Date,
+    // Emergency specific fields
+    medicalAidProvider: String,
+    medicalAidNumber: String,
+    bloodType: String,
+    allergies: String,
+    medications: String,
+    organDonor: Boolean,
+    iceNote: String,
+    emergencyContact1Name: String,
+    emergencyContact1Phone: String,
+    emergencyContact1CountryCode: String,
+    emergencyContact2Name: String,
+    emergencyContact2Phone: String,
+    emergencyContact2CountryCode: String
   },
   contact: {
     name: {
@@ -61,6 +75,10 @@ const qrCodeSchema = new mongoose.Schema({
       required: true
     },
     backupPhone: String,
+    backupCountryCode: {
+      type: String,
+      default: '+27'
+    },
     countryCode: {
       type: String,
       default: '+27'
@@ -90,6 +108,10 @@ const qrCodeSchema = new mongoose.Schema({
       default: true
     },
     showContactOnFinderPage: {
+      type: Boolean,
+      default: true
+    },
+    useBackupNumber: {
       type: Boolean,
       default: true
     }

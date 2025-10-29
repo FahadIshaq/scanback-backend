@@ -381,10 +381,10 @@ router.post('/generate-qr', auth, adminAuth, async (req, res) => {
   try {
     const { type } = req.body;
     
-    if (!type || !['item', 'pet'].includes(type)) {
+    if (!type || !['item', 'pet', 'emergency', 'any'].includes(type)) {
       return res.status(400).json({
         success: false,
-        message: 'Type must be either item or pet'
+        message: 'Type must be either item, pet, emergency, or any'
       });
     }
 
@@ -392,7 +392,7 @@ router.post('/generate-qr', auth, adminAuth, async (req, res) => {
     const qrData = {
       type,
       details: {
-        name: `Blank ${type === "pet" ? "Pet" : "Item"} QR Code`,
+        name: `Blank ${type === "pet" ? "Pet" : type === "emergency" ? "Emergency Contact" : "Item"} QR Code`,
         description: "",
         category: "",
         color: "",
@@ -404,6 +404,20 @@ router.post('/generate-qr', auth, adminAuth, async (req, res) => {
           breed: "",
           age: undefined,
           microchipId: ""
+        } : type === "emergency" ? {
+          medicalAidProvider: "",
+          medicalAidNumber: "",
+          bloodType: "",
+          allergies: "",
+          medications: "",
+          organDonor: false,
+          iceNote: "",
+          emergencyContact1Name: "",
+          emergencyContact1Phone: "",
+          emergencyContact1CountryCode: "",
+          emergencyContact2Name: "",
+          emergencyContact2Phone: "",
+          emergencyContact2CountryCode: ""
         } : {
           value: undefined,
           purchaseDate: undefined,
